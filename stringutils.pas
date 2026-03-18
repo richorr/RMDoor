@@ -62,7 +62,12 @@ begin
           while (I < Length(AText)) do
           begin
                Inc(I);
-               if (AText[I] = '|') and (Length(AText) - I >= 2) then
+               if (AText[I] = '|') and (Length(AText) - I >= 1) and (AText[I + 1] = '|') then
+               begin
+                    { || is the escape sequence for a literal | character }
+                    S := S + '|';
+                    Inc(I);
+               end else if (AText[I] = '|') and (Length(AText) - I >= 2) then
                begin
                     Attr := StrToIntDef('$' + Copy(AText, I + 1, 2), -1);
                     if (Attr <> -1) then
