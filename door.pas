@@ -128,6 +128,8 @@ procedure DoorDisplayFile(AFilename: String);
 procedure DoorGotoX(AX: Byte);
 procedure DoorGotoXY(AX, AY: Byte);
 procedure DoorGotoY(AY: Byte);
+procedure DoorSetScroll(StartRow, EndRow: integer);
+procedure DoorResetScroll;
 function DoorInput(ADefaultText, AAllowedCharacters: String; APasswordCharacter: Char; AVisibleLength, AMaxLength, AAttr: Byte): String;
 function DoorKeyPressed: Boolean;
 function DoorLiteBar(APageSize: Integer): Boolean;
@@ -329,6 +331,16 @@ end;
 procedure DoorCursorSave;
 begin
   DoorWrite(AnsiCursorSave);
+end;
+
+procedure DoorSetScroll(StartRow, EndRow: integer);
+begin
+  DoorWrite(AnsiSetScroll(StartRow, EndRow));
+end;
+
+procedure DoorResetScroll;
+begin
+  DoorWrite(AnsiResetScroll);
 end;
 
 {
