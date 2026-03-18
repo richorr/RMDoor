@@ -19,6 +19,8 @@ function AnsiCursorRestore: String;
 function AnsiCursorRight(ACount: Byte): String;
 function AnsiCursorSave: String;
 function AnsiCursorUp(ACount: Byte): String;
+function AnsiSetScroll(StartRow, EndRow: integer): String;
+function AnsiResetScroll: String;
 function AnsiGotoX(AX: Byte): String;
 function AnsiGotoXY(AX, AY: Byte): String;
 function AnsiGotoY(AY: Byte): String;
@@ -98,6 +100,18 @@ end;
 function AnsiCursorUp(ACount: Byte): String;
 begin
      Result := #27 + '[' + IntToStr(ACount) + 'A';
+end;
+
+function AnsiSetScroll(StartRow, EndRow: integer): String;
+begin
+    (* <ESC>[{start};{end}r *)
+     Result := #27 + '[' + IntToStr(StartRow) + ';' + IntToStr(EndRow) + ';r';
+end;
+
+function AnsiResetScroll: String;
+begin
+    (* <ESC>[r *)
+     Result := #27 + 'r';
 end;
 
 function AnsiGotoX(AX: Byte): String;
