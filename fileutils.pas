@@ -23,6 +23,69 @@ function WriteFile(AFileName: String; var ASL: TStringList; ATimeoutInMillisecon
 
 implementation
 
+{$IFDEF UNIX}
+uses BaseUnix;
+{$ENDIF}
+
+{ Attempt to acquire an exclusive advisory lock on an already-open file descriptor.
+  Returns false immediately (non-blocking) if another process holds the lock, so
+  callers can close the file and retry within their timeout loop.
+  Lock is automatically released when the file is closed.
+  On Windows the lock is enforced at open time via FileMode; this always returns true. }
+function TryLockFd(fd: cint): boolean;
+{$IFDEF UNIX}
+var
+  fl: TFlock;
+{$ENDIF}
+begin
+{$IFDEF UNIX}
+  FillChar(fl, SizeOf(fl), 0);
+  fl.l_type   := F_WRLCK; { exclusive write lock }
+  fl.l_whence := 0;        { SEEK_SET }
+  fl.l_start  := 0;
+  fl.l_len    := 0;        { 0 = lock entire file }
+  Result := fpfcntl(fd, F_SetLk, fl) = 0; { F_SetLk = non-blocking }
+{$ELSE}
+  Result := true; { Windows: exclusive access enforced at open time via FileMode }
+{$ENDIF}
+end;
+
+function LockFile(handle, start, length: LongInt): LongInt;
+{$IFDEF UNIX}
+var
+  fl: TFlock;
+{$ENDIF}
+begin
+{$IFDEF UNIX}
+  FillChar(fl, SizeOf(fl), 0);
+  fl.l_type   := F_WRLCK;
+  fl.l_whence := 0;
+  fl.l_start  := start;
+  fl.l_len    := length;
+  Result := fpfcntl(handle, F_SetLkW, fl); { F_SetLkW = blocking wait }
+{$ELSE}
+  Result := 0;
+{$ENDIF}
+end;
+
+function UnLockFile(handle, start, length: LongInt): LongInt;
+{$IFDEF UNIX}
+var
+  fl: TFlock;
+{$ENDIF}
+begin
+{$IFDEF UNIX}
+  FillChar(fl, SizeOf(fl), 0);
+  fl.l_type   := F_UNLCK;
+  fl.l_whence := 0;
+  fl.l_start  := start;
+  fl.l_len    := length;
+  Result := fpfcntl(handle, F_SetLk, fl);
+{$ELSE}
+  Result := 0;
+{$ENDIF}
+end;
+
 function CopyFile(ASourceFileName, ADestFileName: String; ATimeoutInMilliseconds: Integer): Boolean;
 var
   Buffer: Array[1..1024] of Byte;
@@ -85,29 +148,29 @@ begin
   WriteLn(F, Report);
 end;
 
-function LockFile(handle, start, length: LongInt): LongInt;
-begin
-  WriteLn('REEPORT FileUtils LockFile'); Halt;
-  Result := 0;
-end;
-
 function OpenFileForAppend(out F: Text; AFileName: String; ATimeoutInMilliseconds: Integer): Boolean;
 var
   I: Integer;
 begin
   Result := false;
 
-  // TODOX Race condition
   if (FileExists(AFileName)) then
   begin
     for I := 1 to ATimeoutInMilliseconds div 100 do
     begin
+{$IFDEF WINDOWS}
+      FileMode := fmOpenReadWrite or fmShareExclusive;
+{$ENDIF}
       Assign(F, AFileName);
       {$I-}Append(F);{$I+}
       if (IOResult = 0) then
       begin
-        Result := true;
-        Exit;
+        if TryLockFd(TextRec(F).Handle) then
+        begin
+          Result := true;
+          Exit;
+        end;
+        Close(F); { lock not available — close and retry }
       end;
 
       Sleep(100); // Wait 1/10th of a second before retrying
@@ -126,12 +189,19 @@ begin
 
   for I := 1 to ATimeoutInMilliseconds div 100 do
   begin
+{$IFDEF WINDOWS}
+    FileMode := fmOpenReadWrite or fmShareExclusive;
+{$ENDIF}
     Assign(F, AFileName);
     {$I-}ReWrite(F, 1);{$I+}
     if (IOResult = 0) then
     begin
-      Result := true;
-      Exit;
+      if TryLockFd(FileRec(F).Handle) then
+      begin
+        Result := true;
+        Exit;
+      end;
+      Close(F);
     end;
 
     Sleep(100); // Wait 1/10th of a second before retrying
@@ -146,12 +216,19 @@ begin
 
   for I := 1 to ATimeoutInMilliseconds div 100 do
   begin
+{$IFDEF WINDOWS}
+    FileMode := fmOpenReadWrite or fmShareExclusive;
+{$ENDIF}
     Assign(F, AFileName);
     {$I-}ReWrite(F);{$I+}
     if (IOResult = 0) then
     begin
-      Result := true;
-      Exit;
+      if TryLockFd(TextRec(F).Handle) then
+      begin
+        Result := true;
+        Exit;
+      end;
+      Close(F);
     end;
 
     Sleep(100); // Wait 1/10th of a second before retrying
@@ -184,17 +261,23 @@ var
 begin
   Result := false;
 
-  // TODOX Race condition
   if (FileExists(AFileName)) then
   begin
     for I := 1 to ATimeoutInMilliseconds div 100 do
     begin
+{$IFDEF WINDOWS}
+      FileMode := fmOpenReadWrite or fmShareExclusive;
+{$ENDIF}
       Assign(F, AFileName);
       {$I-}Reset(F, 1);{$I+}
       if (IOResult = 0) then
       begin
-        Result := true;
-        Exit;
+        if TryLockFd(FileRec(F).Handle) then
+        begin
+          Result := true;
+          Exit;
+        end;
+        Close(F); { lock not available — close and retry }
       end;
 
       Sleep(100); // Wait 1/10th of a second before retrying
@@ -283,12 +366,6 @@ begin
   end;
 end;
 
-function UnLockFile(handle, start, length: LongInt): LongInt;
-begin
-  WriteLn('REEPORT FileUtils UnLockFile'); Halt;
-  Result := 0;
-end;
-
 function WriteFile(AFileName: String; var ASL: TStringList; ATimeoutInMilliseconds: Integer): Boolean;
 var
   I: Integer;
@@ -311,4 +388,3 @@ begin
 end;
 
 end.
-
