@@ -32,7 +32,7 @@ uses BaseUnix;
   callers can close the file and retry within their timeout loop.
   Lock is automatically released when the file is closed.
   On Windows the lock is enforced at open time via FileMode; this always returns true. }
-function TryLockFd(fd: cint): boolean;
+function TryLockFd(fd: {$IFDEF UNIX}cint{$ELSE}LongWord{$ENDIF}): boolean;
 {$IFDEF UNIX}
 var
   fl: TFlock;
