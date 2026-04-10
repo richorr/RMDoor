@@ -116,13 +116,12 @@ end;
 
 function AnsiGotoX(AX: Byte): String;
 begin
-  Result := AnsiCursorLeft(255);
-  if (AX > 1) then Result := Result + AnsiCursorRight(AX - 1);
+  Result := #27 + '[' + IntToStr(AX) + 'G';
 end;
 
 function AnsiGotoXY(AX, AY: Byte): String;
 begin
-  Result := #27 + '[' + IntToStr(AY) + ';' + IntToStr(AX) + 'f';
+  Result := #27 + '[' + IntToStr(AY) + ';' + IntToStr(AX) + 'H';
 end;
 
 function AnsiGotoY(AY: Byte): String;

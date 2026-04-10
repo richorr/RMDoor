@@ -700,6 +700,25 @@ begin
     begin
       // Check for local keypress
       Ch := ReadKey;
+      if (Ch = #27) and KeyPressed then
+      begin
+        Ch := ReadKey;
+        if (Ch = '[') then
+        begin
+          { Terminal responses can arrive through STDIO/local input too
+            (e.g. ESC[1c / ESC[?1c).  Consume the CSI sequence so it does not
+            leak into menu/prompt handling one byte at a time. }
+          while KeyPressed and not (Ch in ['@'..'~']) do
+            Ch := ReadKey;
+          DoorLastKey.Location := lkNone;
+        end
+        else
+        begin
+          Ch := #27;
+          DoorLastKey.Extended := False;
+          DoorLastKey.Location := lkLocal;
+        end;
+      end else
       if (Ch = #0) then
       begin
         Ch := ReadKey;
@@ -765,6 +784,23 @@ begin
                        Ch := 'K'; // Left arrow
                        DoorLastKey.Extended := True;
                        DoorLastKey.Location := lkRemote;
+                     end;
+                '?', '0'..'9', ';':
+                     begin
+                       { Terminal Device Attributes replies can arrive as
+                         ESC[?1c / ESC[?2c / ESC[?17;0;64c.  Consume the rest
+                         of the CSI sequence instead of returning its tail as
+                         menu input or letting it leak into prompts. }
+                       while not (Ch in ['@'..'~']) do
+                       begin
+                         for I := 1 to 10 do
+                         begin
+                           if Not(CommCharAvail) then Sleep(50);
+                         end;
+                         if not CommCharAvail then Break;
+                         Ch := CommReadChar;
+                       end;
+                       DoorLastKey.Location := lkNone;
                      end;
               end;
             end else
@@ -1009,6 +1045,38 @@ end;
   Writes a line of text to the screen
 }
 procedure DoorWrite(AText: String);
+  function StripAnsiDeviceAttributes(const S: String): String;
+  var
+    I, J: Integer;
+    Ch: Char;
+  begin
+    Result := '';
+    I := 1;
+    while I <= Length(S) do
+    begin
+      if (S[I] = #27) and (I + 1 <= Length(S)) and (S[I + 1] = '[') then
+      begin
+        J := I + 2;
+        while J <= Length(S) do
+        begin
+          Ch := S[J];
+          if (Ch >= '@') and (Ch <= '~') then Break;
+          Inc(J);
+        end;
+
+        { CSI ... c is a terminal Device Attributes request/reply family, not
+          visual rendering. Never forward it as door output. }
+        if (J <= Length(S)) and (S[J] = 'c') then
+        begin
+          I := J + 1;
+          Continue;
+        end;
+      end;
+
+      Result := Result + S[I];
+      Inc(I);
+    end;
+  end;
 var
   BackTick2: String;
   BackTick3: String;
@@ -1117,8 +1185,16 @@ begin
     end;
   end else
   begin
-    AnsiWrite(AText);
-    if Not(DoorLocal) AND NOT(STDIO) then CommWrite(AText);
+    AText := StripAnsiDeviceAttributes(AText);
+    if STDIO then
+    begin
+      System.Write(Output, AText);
+      System.Flush(Output);
+    end else
+    begin
+      AnsiWrite(AText);
+      if Not(DoorLocal) then CommWrite(AText);
+    end;
   end;
 end;
 
@@ -1226,4 +1302,3 @@ begin
        TimeOn := 0;
   end;
 end.
-
