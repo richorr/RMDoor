@@ -29,8 +29,14 @@ uses BaseUnix;
 type
   {$IFDEF LINUX}
   TPlatformFlock = FLock;
+  const
+    PlatformWriteLock = 1; { Linux F_WRLCK }
+    PlatformUnlock = 2;    { Linux F_UNLCK }
   {$ELSE}
   TPlatformFlock = TFlock;
+  const
+    PlatformWriteLock = F_WRLCK;
+    PlatformUnlock = F_UNLCK;
   {$ENDIF}
 {$ENDIF}
 
@@ -47,7 +53,7 @@ var
 begin
 {$IFDEF UNIX}
   FillChar(fl, SizeOf(fl), 0);
-  fl.l_type   := F_WRLCK; { exclusive write lock }
+  fl.l_type   := PlatformWriteLock; { exclusive write lock }
   fl.l_whence := 0;        { SEEK_SET }
   fl.l_start  := 0;
   fl.l_len    := 0;        { 0 = lock entire file }
@@ -65,7 +71,7 @@ var
 begin
 {$IFDEF UNIX}
   FillChar(fl, SizeOf(fl), 0);
-  fl.l_type   := F_WRLCK;
+  fl.l_type   := PlatformWriteLock;
   fl.l_whence := 0;
   fl.l_start  := start;
   fl.l_len    := length;
@@ -83,7 +89,7 @@ var
 begin
 {$IFDEF UNIX}
   FillChar(fl, SizeOf(fl), 0);
-  fl.l_type   := F_UNLCK;
+  fl.l_type   := PlatformUnlock;
   fl.l_whence := 0;
   fl.l_start  := start;
   fl.l_len    := length;
