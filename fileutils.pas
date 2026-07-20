@@ -25,6 +25,13 @@ implementation
 
 {$IFDEF UNIX}
 uses BaseUnix;
+
+type
+  {$IFDEF LINUX}
+  TPlatformFlock = FLock;
+  {$ELSE}
+  TPlatformFlock = TFlock;
+  {$ENDIF}
 {$ENDIF}
 
 { Attempt to acquire an exclusive advisory lock on an already-open file descriptor.
@@ -35,7 +42,7 @@ uses BaseUnix;
 function TryLockFd(fd: {$IFDEF UNIX}cint{$ELSE}LongWord{$ENDIF}): boolean;
 {$IFDEF UNIX}
 var
-  fl: TFlock;
+  fl: TPlatformFlock;
 {$ENDIF}
 begin
 {$IFDEF UNIX}
@@ -53,7 +60,7 @@ end;
 function LockFile(handle, start, length: LongInt): LongInt;
 {$IFDEF UNIX}
 var
-  fl: TFlock;
+  fl: TPlatformFlock;
 {$ENDIF}
 begin
 {$IFDEF UNIX}
@@ -71,7 +78,7 @@ end;
 function UnLockFile(handle, start, length: LongInt): LongInt;
 {$IFDEF UNIX}
 var
-  fl: TFlock;
+  fl: TPlatformFlock;
 {$ENDIF}
 begin
 {$IFDEF UNIX}
